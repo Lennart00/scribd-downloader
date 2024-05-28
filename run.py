@@ -32,6 +32,7 @@ with sync_playwright() as playwright:
 	total_args = len(sys.argv)
 	# Initialize an empty list to store the cache directories
 	cache_dirs = []
+	book_filenames = []
 
 
 
@@ -41,6 +42,7 @@ with sync_playwright() as playwright:
 
 		# create cache dir
 		book_filename = book_url.split('/')[5]
+		book_filenames.append(book_filename)
 		current_cache_directory = f'{os.getcwd()}/{book_filename}'
 		cache_dirs.append(current_cache_directory)
 		try:
@@ -151,17 +153,18 @@ with sync_playwright() as playwright:
 			time.sleep(1)
 			chapter_no += 1
 
-	print('Merging PDF pages...')
-	merger = PdfMerger()
+print('Merging PDF pages...')
+merger = PdfMerger()
+#TODO need to iterate over book_filenames and also add iteration over an array of chapter nos saved from the process above into an array
+book_filenames
+for cache_dir in cache_dirs:
+	for chapter_no in range(1, num_of_chapters+1):
+		merger.append(f"{cache_dir}/{chapter_no}.pdf")
 
-	for cache_dir in cache_dirs:
-		for chapter_no in range(1, num_of_chapters+1):
-			merger.append(f"{cache_dir}/{chapter_no}.pdf")
+	merger.write(f"{book_filename}.pdf")
+	merger.close()
 
-		merger.write(f"{book_filename}.pdf")
-		merger.close()
+	# delete cache dir
+	shutil.rmtree(cache_dir)
 
-		# delete cache dir
-		shutil.rmtree(cache_dir)
-
-	print('Download completed, enjoy your book!')
+print('Download completed, enjoy your book!')
