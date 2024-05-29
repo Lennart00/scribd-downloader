@@ -169,7 +169,7 @@ merger = PdfMerger()
 # TODO need to iterate over book_filenames and also add iteration over an array of chapter nos saved from the process above into an array
 
 for i in range(1, total_args):
-    print('attempting merge of book number: ' + i)
+    print('attempting merge of book number: {i}')
     for chapter_no in range(1, num_of_chapters + 1):
         merger.append(f"{cache_dirs[i]}/{chapter_no}.pdf")
 
