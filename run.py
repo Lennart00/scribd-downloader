@@ -207,7 +207,6 @@ with sync_playwright() as playwright:
 
 print("Merging PDF pages...")
 merger = PdfMerger()
-# TODO need to iterate over book_filenames and also add iteration over an array of chapter nos saved from the process above into an array
 
 for i in range(1, total_args):
     iter = i - 1 
