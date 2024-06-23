@@ -1,5 +1,7 @@
 from playwright.sync_api import sync_playwright
 from PyPDF2 import PdfMerger
+from functools import cmp_to_key
+
 
 import os
 import re
@@ -7,6 +9,26 @@ import sys
 import time
 import shutil
 
+def alphanum_sort(file1, file2):
+    def convert(text):
+        return int(text) if text.isdigit() else text.lower()
+
+    def alphanum_key(key):
+        import re
+        return [convert(c) for c in re.split('([0-9]+)', key)]
+    
+    return (alphanum_key(file1) > alphanum_key(file2)) - (alphanum_key(file1) < alphanum_key(file2))
+
+# Extract the number from the last file's name
+def extract_number(filename):
+    parts = re.split(r'[._]', filename)
+    for part in parts:
+        if part.isdigit():
+            return int(part)
+    return None
+#TODO implement the following example for finding the chapter numbers based on the file structure in the cache directory
+# files = os.listdir(path)
+# files.sort(key=cmp_to_key(alphanum_sort))
 ZOOM = 0.625
 
 
@@ -30,22 +52,41 @@ with sync_playwright() as playwright:
     # Get the total number of command-line arguments
     total_args = len(sys.argv)
     # Initialize an empty list to store the cache directories
-    cache_dirs = []
-    book_filenames = []
+    class BookInformation(object):
+        current_cache_directory = ''
+        book_filename = ''
+        chapter_no = 1
+        num_of_chapters = 0
+    
+    books = []
+
 
     # Iterate over the arguments
     for i in range(1, total_args):
+        iter = i - 1 
         book_url = sys.argv[i]
+        books.append(BookInformation())
 
         # create cache dir
-        book_filename = book_url.split("/")[5]
-        book_filenames.append(book_filename)
-        current_cache_directory = f"{os.getcwd()}/{book_filename}"
-        cache_dirs.append(current_cache_directory)
+        books[iter].book_filename = book_url.split("/")[5]
+        book_filename = books[iter].book_filename
+        #book_filenames.append(book_filename)
+        books[iter].current_cache_directory = f"{os.getcwd()}/{book_filename}"
+        current_cache_directory = books[iter].current_cache_directory
         try:
             os.mkdir(current_cache_directory)
         except FileExistsError:
-            pass
+            files = os.listdir(books[iter].current_cache_directory)
+            files.sort(key=cmp_to_key(alphanum_sort))
+            # Get the last entry in the sorted list
+            last_file = files[-1]
+            print("Last file:", last_file)
+            # Get the number from the last file
+            number = extract_number(last_file)
+            print("Extracted number:", number)
+            books[iter].num_of_chapters = number
+            books[iter].chapter_no = number
+            continue
         print(f"Starting process of downloading book {i}: {sys.argv[i]}")
 
         browser = playwright.chromium.launch(headless=True)
@@ -90,13 +131,13 @@ with sync_playwright() as playwright:
         chapter_selector.nth(0).wait_for(state="visible")
 
         # retrieve the number of chapters
-        num_of_chapters = chapter_selector.count()
+        books[iter].num_of_chapters = chapter_selector.count()
 
         # load the first chapter
         page.evaluate(
             "() => document.querySelector('li.text_btn[data-idx=\"0\"]').click()"
         )
-        chapter_no = 1
+        books[iter].chapter_no = 1
 
         # to render the chapter pages and save them as pdf
         render_page = context.new_page()
@@ -110,7 +151,7 @@ with sync_playwright() as playwright:
             number_of_chapter_pages = chapter_pages.count()
 
             print(
-                f"Downloading chapter {chapter_no}/{num_of_chapters} ({number_of_chapter_pages} pages)"
+                f"Downloading chapter {books[iter].chapter_no}/{books[iter].num_of_chapters} ({number_of_chapter_pages} pages)"
             )
 
             merger = PdfMerger()
@@ -143,18 +184,18 @@ with sync_playwright() as playwright:
                 render_page.set_content(content)
 
                 # print pdf
-                pdf_file = f"{current_cache_directory}/{chapter_no}_{page_no}.pdf"
+                pdf_file = f"{current_cache_directory}/{books[iter].chapter_no}_{page_no}.pdf"
                 render_page.pdf(path=pdf_file, prefer_css_page_size=True)
                 merger.append(pdf_file)
 
                 if page_no == number_of_chapter_pages:
-                    merger.write(f"{current_cache_directory}/{chapter_no}.pdf")
+                    merger.write(f"{current_cache_directory}/{books[iter].chapter_no}.pdf")
                     merger.close()
                     break
 
                 page_no += 1
 
-            if chapter_no == num_of_chapters:
+            if books[iter].chapter_no == books[iter].num_of_chapters:
                 break
 
             page.evaluate(
@@ -162,21 +203,22 @@ with sync_playwright() as playwright:
             )
 
             time.sleep(1)
-            chapter_no += 1
+            books[iter].chapter_no += 1
 
 print("Merging PDF pages...")
 merger = PdfMerger()
 # TODO need to iterate over book_filenames and also add iteration over an array of chapter nos saved from the process above into an array
 
 for i in range(1, total_args):
+    iter = i - 1 
     print('attempting merge of book number: {i}')
-    for chapter_no in range(1, num_of_chapters + 1):
-        merger.append(f"{cache_dirs[i]}/{chapter_no}.pdf")
+    for books[iter].chapter_no in range(1, books[iter].num_of_chapters + 1):
+        merger.append(f"{books[iter].current_cache_directory}/{books[iter].chapter_no}.pdf")
 
-    merger.write(f"{book_filenames[i]}.pdf")
-    merger.close()
+    merger.write(f"{books[iter].book_filename}.pdf")
 
     # delete cache dir
-    shutil.rmtree(cache_dirs[i])
+    #shutil.rmtree(books[iter].current_cache_directory)
 
+merger.close()
 print("Download completed, enjoy your book!")
