@@ -26,9 +26,9 @@ def extract_number(filename):
         if part.isdigit():
             return int(part)
     return None
-#TODO implement the following example for finding the chapter numbers based on the file structure in the cache directory
-# files = os.listdir(path)
-# files.sort(key=cmp_to_key(alphanum_sort))
+
+#TODO implement source conversion to merged pdf only mode.
+#TODO implement persistent session without email code somehow
 ZOOM = 0.625
 
 
@@ -71,7 +71,7 @@ with sync_playwright() as playwright:
         books[iter].book_filename = book_url.split("/")[5]
         book_filename = books[iter].book_filename
         #book_filenames.append(book_filename)
-        books[iter].current_cache_directory = f"{os.getcwd()}/{book_filename}"
+        books[iter].current_cache_directory = f"{os.getcwd()}/sources/{book_filename}"
         current_cache_directory = books[iter].current_cache_directory
         try:
             os.mkdir(current_cache_directory)
@@ -215,7 +215,7 @@ for i in range(1, total_args):
     for books[iter].chapter_no in range(1, books[iter].num_of_chapters + 1):
         merger.append(f"{books[iter].current_cache_directory}/{books[iter].chapter_no}.pdf")
 
-    merger.write(f"{books[iter].book_filename}.pdf")
+    merger.write(f"out/{books[iter].book_filename}.pdf")
 
     # delete cache dir
     #shutil.rmtree(books[iter].current_cache_directory)
